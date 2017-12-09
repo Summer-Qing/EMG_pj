@@ -27,8 +27,8 @@ def loaddata(filename):
             for y in range(len(rows[i])):
                 rows[i][y] = float(rows[i][y])
         del rows[0]
-    print ">>总共的采样点数为",':',len(rows)
-    print ">>原始数据列数", ':', len(rows[0])
+    #print ">>总共的采样点数为",':',len(rows)
+    #print ">>原始数据列数", ':', len(rows[0])
     return rows
 
 ######## 计算平均值，并加入数据中 ########
@@ -40,7 +40,7 @@ def AddMeanChannel(rows):
             s = s + rows[n][m]
         rows[n].append(s/10)
     rows_mean = rows
-    print ">>载入平均值后的数据列数为", ':', len(rows_mean[0])
+    # print ">>载入平均值后的数据列数为", ':', len(rows_mean[0])
     return rows_mean
 
 ######## 计算极大值，并加入数据中 ########
@@ -53,7 +53,7 @@ def AddMaxChannel(rows,rows_mean):
             rows_mean_max[n].append(mx)
         else :
             rows_mean_max[n].append(mn)
-    print ">>载入极大值后的数据列数为", ':', len(rows_mean_max[0])
+    # print ">>载入极大值后的数据列数为", ':', len(rows_mean_max[0])
     return rows_mean_max
 
 ######## 通过时间轴算出时间，加入数据中，并将行换成列【前8通道，平均值，极大值，时间】 ########
@@ -68,7 +68,7 @@ def ToColumns(rows_in):
         cols.append(column)
     cols.append(temp)
     del cols[0]
-    print ">>最终转换后的数据列数<应为11>", ':', len(cols)
+    # print ">>最终转换后的数据列数<应为11>", ':', len(cols)
     return cols
 
 #########################
@@ -202,44 +202,57 @@ def data_collecting(data_name, label):
 
     all_maxvalue_t = []
 	## 提取数据 ##
-    print "######## 提取数据部分 ########"
-    for i in range(1,4):
-        rows = loaddata('emg_liqingqing{}.csv'.format(data_name,i))
 
-        ## 求出每一行数据的平均值 ##
-        rows_mean = AddMeanChannel(rows)
-        ## 求出每一行数据的极大值 ##
-        rows_in = AddMaxChannel(rows, rows_mean)
-        ## 列变行
-        cols = ToColumns(rows_in)
+    path = os.getcwd()
+    # for root,dir,files in os.walk('{}/data'.format(path)):
+    # print "######## 提取数据部分 ########"
+    # for i in range(len(data_name)):
+    for root,dir,files in os.walk('{}/data'.format(path)): # 得到全部的文件
+        pass
 
-        ## 去噪 ##
-        print "## 数据去噪部分 ##"
-        emg_after_denoise = []
-        for i in range(len(cols)-1):
-            y = butter_highpass_filter(cols[i], highcut, fs, order=6)
-            y_pli = pli_remove(fs, f0, y)
-            y_ti = TI_Denoise(y_pli,'sym8',10,1,10)
-            emg_after_denoise.append(y_ti)
-        print ">>去噪后的数据列数",':',len(emg_after_denoise)
+    wrong_files = [] # 记录处理出错的文件
+    for file in range(len(files)):
+        rows = loaddata(files[file])
+        print ">>处理数据文件 ：{}".format(files[file])
+        
+        try:
+            ## 求出每一行数据的平均值 ##
+            rows_mean = AddMeanChannel(rows)
+            ## 求出每一行数据的极大值 ##
+            rows_in = AddMaxChannel(rows, rows_mean)
+            ## 列变行
+            cols = ToColumns(rows_in)
 
-        ## 分割 ##
-        print "## 数据平滑部分 ##"
-        # 平滑 #
-        mavg = AllMovingAverage(emg_after_denoise, avpara)
-        all_maxvalue, all_maxindex = FindAllMaxVal(mavg)# maxvalue, maxindex
-        # print ">>最大值",':',all_maxvalue
-        # print ">>相应索引值", ':', all_maxindex
+            ## 去噪 ##
+           #  print "## 数据去噪部分 ##"
+            emg_after_denoise = []
+            for i in range(len(cols)-1):
+                y = butter_highpass_filter(cols[i], highcut, fs, order=6)
+                y_pli = pli_remove(fs, f0, y)
+                y_ti = TI_Denoise(y_pli,'sym8',10,1,10)
+                emg_after_denoise.append(y_ti)
+            #  print ">>去噪后的数据列数",':',len(emg_after_denoise)
 
-        # 如果数据集是空的，就将此列设为初始列
-        # 如果不是空的， 提取生成的每一个动作的八个数据，增加到原来的列
-        if not all_maxvalue_t:
-            all_maxvalue_t = Transform_data(all_maxvalue, label)
-        else:
-            tmp = Transform_data(all_maxvalue, label)
-            for i in range(len(tmp)):
-                all_maxvalue_t.append(tmp[i])
-    return all_maxvalue_t
+            ## 分割 ##
+            # print "## 数据平滑部分 ##"
+            # 平滑 #
+            mavg = AllMovingAverage(emg_after_denoise, avpara)
+            all_maxvalue, all_maxindex = FindAllMaxVal(mavg)# maxvalue, maxindex
+            # print ">>最大值",':',all_maxvalue
+            # print ">>相应索引值", ':', all_maxindex
+
+            # 如果数据集是空的，就将此列设为初始列
+            # 如果不是空的， 提取生成的每一个动作的八个数据，增加到原来的列
+            if not all_maxvalue_t:
+                all_maxvalue_t = Transform_data(all_maxvalue, label)
+            else:
+                tmp = Transform_data(all_maxvalue, label)
+                for i in range(len(tmp)):
+                    all_maxvalue_t.append(tmp[i])
+        except:
+            print "Wrong File {}".format(files[file])
+            wrong_files.append(files[file])
+    return all_maxvalue_t, wrong_files
 
 def KNN_algotithm(dataset1,dataset2):
     # 提取一个数据
@@ -248,12 +261,10 @@ def KNN_algotithm(dataset1,dataset2):
 
 
 def main():
-    data_1_name = ''
-    data_2_name = ''
-    dataset1 = data_collecting(data_1_name, label = 0)
-    dataset2 = data_collecting(data_2_name, label = 1)
-    print ">>归一化加标签后的数据集 1",':',dataset1
-    print ">>归一化加标签后的数据集 2",':',dataset2
+    data_name = ['emg_liqingqing', 'emg_qing_', 'emg_yu_0']
+    dataset, wrong_files = data_collecting(data_name, label = 0)
+    print ">>共得到数据{}组 \n ".format(len(dataset))
+    print ">>出现错误的数据 \n" , wrong_files
 
 main()
 	
