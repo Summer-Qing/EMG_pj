@@ -258,14 +258,28 @@ def KNN_algotithm(dataset1,dataset2):
     # 提取一个数据
     pass
 
+# select the data
+def select_batch(data = [],  length = 10):
+    x_batch = []
+    y_batch = []
+    for i in range(len(data)):
+	tmp_x = []
+	tmp_y_one_hot = np.zeros((10), np.int)
+        for j in range(9):
+	    if j <= 7:
+		tmp_x.append(data[i][j])
+	    else:
+		tmp_y_one_hot[data[i][j]] = 1
+	x_batch.append(tmp_x)
+	y_batch.append(np.ndarray.tolist(tmp_y_one_hot))
+    return x_batch, y_batch
 
-
-def main():
+def run():
     data_name = ['emg_liqingqing', 'emg_qing_', 'emg_yu_0']
     dataset, wrong_files = data_collecting(data_name, label = 0)
     print ">>共得到数据{}组 \n ".format(len(dataset))
     print ">>出现错误的数据 \n" , wrong_files
-
-main()
+    x_batch, y_batch = select_batch(dataset)
+    return x_batch, y_batch
 	
 	
